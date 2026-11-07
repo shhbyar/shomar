@@ -135,10 +135,3 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin):
         Index("ix_transactions_account", "account_id"),
         Index("ix_transactions_transfer_group", "transfer_group_id"),
     )
-
-    __table_args__ = (
-        CheckConstraint("amount_minor <> 0", name="ck_transactions_amount_nonzero"),
-        Index("ix_transactions_user_date", "user_id", "occurred_on"),
-        Index("ix_transactions_user_updated", "user_id", "updated_at"),
-        Index("ix_transactions_account", "account_id"),
-    )

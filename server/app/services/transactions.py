@@ -42,12 +42,6 @@ class TransactionService:
         self._check_transfer(data.transfer_group_id, data.category_id)
 
         fields = dict(
-            # ...the existing fields, then:
-            note=data.note,
-            transfer_group_id=data.transfer_group_id,
-        )
-
-        fields = dict(
             user_id=user.id,
             account_id=data.account_id,
             category_id=data.category_id,
@@ -55,6 +49,7 @@ class TransactionService:
             occurred_on=data.occurred_on,
             merchant=data.merchant,
             note=data.note,
+            transfer_group_id=data.transfer_group_id,
         )
         if data.id is not None:
             if self._transactions.id_exists(data.id):
@@ -81,9 +76,18 @@ class TransactionService:
         return transaction
 
     def delete(self, user: User, transaction_id: uuid.UUID) -> None:
+        """Soft delete. A transfer is deleted as a whole, so no half of it is left behind."""
         transaction = self.get(user, transaction_id)
-        transaction.deleted_at = datetime.now(timezone.utc)
+        if transaction.transfer_group_id is not None:
+            self._transactions.soft_delete_group(user.id, transaction.transfer_group_id)
+        else:
+            transaction.deleted_at = datetime.now(timezone.utc)
         self._session.commit()
+
+    @staticmethod
+    def _check_transfer(transfer_group_id: uuid.UUID | None, category_id: uuid.UUID | None) -> None:
+        if transfer_group_id is not None and category_id is not None:
+            raise InvalidInputError("A transfer can't have a category")
 
     def _check_references(
         self,
@@ -110,6 +114,7 @@ class TransactionService:
         if existing.deleted_at is not None:
             raise ConflictError("This transaction was deleted")
         self._check_references(user, data.account_id, data.category_id)
+        self._check_transfer(data.transfer_group_id, data.category_id)
 
         for field, value in data.model_dump().items():
             setattr(existing, field, value)
